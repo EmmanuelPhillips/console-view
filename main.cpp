@@ -5,13 +5,16 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
-void print_pids(const std::filesystem::path &path) {
+std::optional<std::vector<std::filesystem::path>>
+get_pids(const std::filesystem::path &path) {
   // edge cases
   if (!std::filesystem::exists(path) || !std::filesystem::is_directory(path)) {
-    return;
+    return std::nullopt;
   }
 
   std::vector<std::filesystem::path> status_paths{};
@@ -31,18 +34,35 @@ void print_pids(const std::filesystem::path &path) {
       status_paths.emplace_back(status_path);
     }
   }
+  return status_paths;
+}
 
-  for (const auto &path : status_paths) {
-    std::ifstream file(path);
+void print_pids(const std::vector<std::filesystem::path> &pids) {
+  for (const auto &pid : pids) {
+    std::ifstream file(pid);
     if (!file.is_open()) {
       continue;
+    }
+    std::string search_value{"Name:"};
+    std::string line;
+    std::string pid_name;
+    while (std::getline(file, line)) {
+      if (std::string_view{line}.starts_with(search_value)) {
+        pid_name = line.substr(search_value.size());
+      }
+    }
+    if (!pid_name.empty()) {
+      std::cout << pid_name << '\n';
     }
   }
 }
 
 int main() {
   const std::filesystem::path path{"/proc/"};
-  print_pids(path);
+  auto pids{get_pids(path)};
+  if (pids) {
+    print_pids(*pids);
+  }
 
   return 0;
 }
